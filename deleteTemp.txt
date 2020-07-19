@@ -1,0 +1,111 @@
+
+sub SelectFiles(sPath) 
+  set folder = fso.getfolder(sPath) 
+  set files = folder.files 
+  for each file in files 
+    count = count + 1 
+    redim preserve arFiles(count) 
+    set arFiles(count) = file 
+  next 
+  for each fldr in folder.subfolders 
+    SelectFiles fldr.path 
+  next 
+end sub 
+
+
+sub DeleteEmptyFolders(sPath,bDeleteThisFolder) 
+
+
+  set folder = fso.getfolder(sPath) 
+  
+  for each fldr in folder.subfolders 
+    DeleteEmptyFolders fldr.path,true 
+  next 
+
+
+  if (folder.files.count = 0) and _ 
+     (folder.subfolders.count) = 0 and _ 
+     bDeleteThisFolder then 
+    folder.delete 
+    exit sub 
+  end if 
+
+
+end sub 
+Public Function  fn_CloseApplication(byval sApplicationExe)
+Dim strComputer
+Dim objWMIService
+Dim colProcesses
+Dim objProcess
+strComputer = "."
+Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\cimv2")
+
+Set colProcesses = objWMIService.ExecQuery ("Select * from Win32_Process Where Name = '"&sApplicationExe&"'")
+For Each objProcess in colProcesses
+objProcess.Terminate()
+Next
+Set objWMIService = Nothing
+Set colProcesses=Nothing
+End Function
+
+
+
+Set colItems = GetObject("winmgmts:").ExecQuery("Select * from Win32_Process where commandline like '%NewDB_Framework.vbs%'",,48)
+For Each objItem in colItems
+    msgbox "Terminating script with this CommandLine: " & objItem.CommandLine
+    objItem.Terminate(1)
+Next
+
+call fn_CloseApplication( "cmd.exe")
+call fn_CloseApplication( "QTPro.exe")
+'call fn_CloseApplication( "QTAutomationAgent.exe")
+call fn_CloseApplication( "AQTRmtAgent.exe")
+'call fn_CloseApplication( "BP_EXE~1.EXE")
+call fn_CloseApplication( "bp_exec_agent.exe")
+call fn_CloseApplication( "Wexectrl.exe")
+
+
+
+
+
+
+
+
+'===DeleteTempFiles.vbs===
+ 
+ 
+Const TemporaryFolder = 2 'for GetSpecialFolder 
+
+
+set fso = createobject("scripting.filesystemobject") 
+arFiles = array() 
+count = -1 
+
+'get the path to the temp folder 
+' 
+tempdir = fso.GetSpecialFolder(TemporaryFolder) 
+
+
+ 
+SelectFiles tempdir 
+dcount = 0 
+for each file in arFiles 
+  on error resume next 
+  file.delete true 
+  if err.number = 0 then dcount = dcount + 1 
+  err.clear 
+  on error goto 0 
+next 
+
+
+
+
+DeleteEmptyFolders tempdir,false 
+
+
+' 
+'===end-script=== 
+
+
+wscript.sleep (2000)
+msgbox "Temp Files + cmd.exe +  QTPro.exe + QTAutomationAgent.exe + BP_EXE~1.EXEWexectrl.exe "

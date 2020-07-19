@@ -1,0 +1,925 @@
+Call Force32bit
+Dim strDatabase
+Dim strServer
+Dim StrAppName
+
+strServer=""
+ 
+file="C:\IBP_Automation\ExecuteByFramework.txt"
+Const ForWriting = 2
+Const ForReading = 1
+Const ForAppending = 8
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+if objFSO.FileExists(file) then
+	Set objFile = objFSO.OpenTextFile(file, ForReading)
+        	
+	str1=objFile.ReadLine
+	strDatabase=objFile.ReadLine
+        ''msgbox contents
+	objFile.Close
+Else
+       
+        'msgbox "pls check ExecuteByFramework.txt"
+End if
+
+ 'for QAT Production separation
+Dim strDBEnv
+
+'==================Force 32 bit ID================
+Sub Force32bit()
+    If InStr(UCase(WScript.FullName), "SYSTEM32") > 0 and CreateObject("Scripting.FileSystemObject").FolderExists("C:\Windows\SysWOW64") Then 
+        Dim objShell : Set objShell = CreateObject("WScript.Shell") 
+        objShell.CurrentDirectory = "C:\Windows\SysWOW64" 
+        objShell.Run "wscript.exe " & WScript.ScriptFullName,1,False  
+        WScript.Quit 
+    End If 
+End Sub
+'==================Availablity Reporting==========
+Public Function AvailablityReporting(strTestcaseNameTOQuery)
+
+Dim AvailablityConnection
+Dim AvailablityrecordSet
+Set AvailablityConnection=createobject("adodb.connection")
+Set AvailablityrecordSet=createobject("adodb.recordset")
+AvailablityConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd=Transactor;database="&strDatabase
+sql = "SELECT * FROM TestCaseMaster WHERE ApplicationName='"&StrAppName&"' and TestCaseName='"&strTestcaseNameTOQuery&"'"
+AvailablityrecordSet.open sql,AvailablityConnection,1,1	
+''msgbox AuthrecordSet.RecordCount										
+if AvailablityrecordSet.RecordCount>0 then
+   strFailedFlag=AvailablityrecordSet.fields("FailedFlag")
+Else
+    'msgbox "Testcase Name not valid"
+End if
+
+
+AvailablityrecordSet.close		
+Set AvailablityConnection=nothing
+Set AvailablityrecordSet=nothing
+AvailablityReporting=strFailedFlag
+
+End Function
+
+
+Public Function GetTestRunNameFromAppTable(strServer_Name,strQTP_MachineIP)
+'msgbox strServer_Name   &"==="&strQTP_MachineIP
+Dim AvailablityConnection
+Dim AvailablityrecordSet
+Set AvailablityConnection=createobject("adodb.connection")
+Set AvailablityrecordSet=createobject("adodb.recordset")
+AvailablityConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd="";database="&strDatabase
+sql = "SELECT * FROM Application_IBPAutomation WHERE Server_Name= '"&strServer_Name&"' and QTP_MachineIP='"&strQTP_MachineIP&"'"
+'Msgbox "GetTestRunNameFromAppTable"&sql 
+AvailablityrecordSet.open sql,AvailablityConnection,1,1	
+''msgbox AuthrecordSet.RecordCount										
+if AvailablityrecordSet.RecordCount>0 then
+   strExecutionName_DB=AvailablityrecordSet.fields("ExecutionName")
+  ' strExecutionDesc_DB=AvailablityrecordSet.fields("ExecutionDesc")
+Else
+    msgbox "Server Name not valid"
+End if
+
+
+AvailablityrecordSet.close		
+Set AvailablityConnection=nothing
+Set AvailablityrecordSet=nothing
+GetTestRunNameFromAppTable=strExecutionName_DB
+End Function
+
+
+
+'==================End Availablity Reporting==========
+Public Function Execution_Summary(APPLICATION_NAME,ENVIRONMENT_NAME,SERVER_NAME,TESTCASE_NAME,EXECUTION_STATUS,EXECUTION_NAME,AVAILIBILITY_STATUS,EXECUTION_DATE,TIME,DURATION)
+'msgbox "inside Execution summary"
+'Msgbox APPLICATION_NAME
+'If Trim(APPLICATION_NAME)="LEAP" Then
+'SERVER_NAME=TESTCASE_NAME
+'msgbox SERVER_NAME & "SERVER_NAME in execution"
+'Else
+'Msgbox APPLICATION_NAME&"Else block"
+'End If
+
+
+strdate=Split(EXECUTION_DATE," ")
+EXECUTION_DATE=strdate(0)
+'msgbox EXECUTION_DATE&"======"&strDatabase
+
+Dim ReportConnection
+Set ReportConnection=createobject("adodb.connection")
+ReportConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd="";Connectiontimeout=1600;database="&strDatabase
+sql = "INSERT INTO ExecutionResult VALUES ('"&APPLICATION_NAME&"','"&ENVIRONMENT_NAME&"','"&SERVER_NAME&"','"&TESTCASE_NAME&"','"&EXECUTION_STATUS&"','"&EXECUTION_NAME&"','"&AVAILIBILITY_STATUS&"','"&EXECUTION_DATE&"','"&TIME&"','"&DURATION&"');"
+
+'msgbox sql & "Execution_Summary"
+ReportConnection.Commandtimeout=1600
+ReportConnection.Execute sql
+ReportConnection.Close
+
+
+'msgbox "New Report updated "
+End Function
+
+
+
+'====================================Finding QAT |Prod DB==========================================
+Function GetEnvDetails( myPrompt )
+    Dim objIE
+    ' Create an IE object
+    Set objIE = CreateObject( "InternetExplorer.Application" )
+    ' specify some of the IE window's settings
+    objIE.Navigate "about:blank"
+    objIE.Document.Title = "Please Select Environment details" & String( 100, "." )
+    objIE.ToolBar        = False
+    objIE.Resizable      = False
+    objIE.StatusBar      = False
+    objIE.Width          = 400      '320
+    objIE.Height         = 400	 '220
+    ' Center the dialog window on the screen
+    With objIE.Document.ParentWindow.Screen
+        objIE.Left = (.AvailWidth  - objIE.Width ) \ 2
+        objIE.Top  = (.Availheight - objIE.Height) \ 2
+    End With
+    ' Wait till IE is ready
+    Do While objIE.Busy
+        'WScript.Sleep 200
+    Loop
+    ' Insert the HTML code to prompt for a password
+
+
+    objIE.Document.Body.InnerHTML = "<div align=""Center""><p>" &myPrompt _
+& "</p><p>ENVIRONMENT: <Select type=""option"" id=""Env"" name=""Env""><option>QAT</option><option>PROD</option></Select>" _
+& "</p><p><input type=""hidden"" id=""OK"" name=""OK"" value=""0"">" _
+                         & "<input type=""submit"" value="" OK "" " _
+                                  & "onclick=""VBScript:OK.Value=1""></p></div>" 
+   
+
+
+    ' Hide the scrollbars
+    objIE.Document.Body.Style.overflow = "auto"
+    ' Make the window visible
+    objIE.Visible = True
+    ' Set focus on UserName input field
+    'objIE.Document.All.UserName.Focus
+
+    ' Wait till the OK button has been clicked
+    On Error Resume Next
+    Do While objIE.Document.All.OK.Value = 0
+        'WScript.Sleep 200
+        ' Error handling code by Denis St-Pierre
+        If Err Then    'user clicked red X (or alt-F4) to close IE window
+            IELogin = Array( "", "" )
+            objIE.Quit
+            Set objIE = Nothing
+            Exit Function
+        End if
+    Loop
+    On Error Goto 0
+
+
+For Each objOption in objIE.Document.All.Env.Options
+        If objOption.Selected Then
+            StrValue=objOption.InnerText
+        End If
+    Next
+
+
+    ' Close and release the object
+    objIE.Quit
+    Set objIE = Nothing
+
+if lcase(StrValue)="prod" then
+strDatabase="SmokeTA"  'Production
+
+
+Elseif lcase(StrValue)="qat" then
+strDatabase="QAT_Automation"    'QAT
+Else
+'msgbox "please select Env properly"
+End if
+
+file="C:\IBP_Automation\ExecuteByFramework.txt"
+Const ForWriting = 2
+Const ForReading = 1
+Const ForAppending = 8
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+if objFSO.FileExists(file) then
+	Set objFile = objFSO.OpenTextFile(file, ForWriting)
+	objFile.WriteLine "Yes"
+	objFile.WriteLine strDatabase
+        ''msgbox contents
+	objFile.Close
+Else
+       
+        Set objFile =objFSO.CreateTextFile(file, ForWriting)
+       ' 'msgbox "file newly created"
+	objFile.WriteLine "Yes"
+	objFile.WriteLine strDatabase
+	objFile.Close
+End if
+
+
+
+GetEnvDetails=StrValue
+End Function
+
+
+'====================================End of Finding QAT |Prod DB==========================================
+'====================================DeleteTempFiles==========================================
+Const TemporaryFolder = 2 'for GetSpecialFolder 
+set fso = createobject("scripting.filesystemobject") 
+arFiles = array() 
+count = -1 
+
+'get the path to the temp folder 
+' 
+tempdir = fso.GetSpecialFolder(TemporaryFolder) 
+Public Function DeleteTempFiles()
+
+SelectFiles tempdir 
+dcount = 0 
+for each file in arFiles 
+  on error resume next 
+  file.delete true 
+  if err.number = 0 then dcount = dcount + 1 
+  err.clear 
+  on error goto 0 
+next 
+
+DeleteEmptyFolders tempdir,false 
+End Function
+sub SelectFiles(sPath) 
+  set folder = fso.getfolder(sPath) 
+  set files = folder.files 
+  for each file in files 
+    count = count + 1 
+    redim preserve arFiles(count) 
+    set arFiles(count) = file 
+  next 
+  for each fldr in folder.subfolders 
+    SelectFiles fldr.path 
+  next 
+end sub
+sub DeleteEmptyFolders(sPath,bDeleteThisFolder) 
+
+
+  set folder = fso.getfolder(sPath) 
+  
+  for each fldr in folder.subfolders 
+    DeleteEmptyFolders fldr.path,true 
+  next 
+
+
+  if (folder.files.count = 0) and _ 
+     (folder.subfolders.count) = 0 and _ 
+     bDeleteThisFolder then 
+on error resume Next
+    folder.delete 
+    exit sub 
+  end if 
+
+
+end sub 
+'==================================Delete Temp file end-script===================== 
+
+Public Function GetAthu()
+StrIP=GetSystemIP()
+Dim AuthConnection
+Dim AuthrecordSet
+Set AuthConnection=createobject("adodb.connection")
+Set AuthrecordSet=createobject("adodb.recordset")
+'msgbox strDatabase
+AuthConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd=Transactor;database="&strDatabase
+sql = "SELECT * FROM Application_IBPAutomation WHERE QTP_MachineIP='" &StrIP& " ' and Execution_Flag='Yes' and Authentication_Flag='Yes'"
+AuthrecordSet.open sql,AuthConnection,1,1	
+''msgbox AuthrecordSet.RecordCount										
+if AuthrecordSet.RecordCount>0 then
+
+''msgbox "No Authentication Requried" 
+	
+   'Wscript.Quit
+Else
+    Call LoginCheck()
+
+'Wscript.Quit
+End if
+
+
+AuthrecordSet.close		
+Set AuthConnection=nothing
+Set AuthrecordSet=nothing
+End Function
+
+
+Function GetPassword( myPrompt )
+
+    Dim objIE
+    ' Create an IE object
+    Set objIE = CreateObject( "InternetExplorer.Application" )
+    ' specify some of the IE window's settings
+    objIE.Navigate "about:blank"
+    objIE.Document.Title = "Login for VBS Execution " & String( 100, "." )
+    objIE.ToolBar        = False
+    objIE.Resizable      = False
+    objIE.StatusBar      = False
+    objIE.Width          = 320
+    objIE.Height         = 220
+    ' Center the dialog window on the screen
+    With objIE.Document.ParentWindow.Screen
+        objIE.Left = (.AvailWidth  - objIE.Width ) \ 2
+        objIE.Top  = (.Availheight - objIE.Height) \ 2
+    End With
+    ' Wait till IE is ready
+    Do While objIE.Busy
+        'WScript.Sleep 200
+    Loop
+    ' Insert the HTML code to prompt for a password
+    objIE.Document.Body.InnerHTML = "<div align=""center""><p>" &myPrompt _
+                                  & "</p><p>UserName : <input type=""UserName""  id=""UserName"">" _
+			  	  & "</p><p>Password : <input type=""password"" " _
+                                  & "id=""Password""></p><p><input type=" _
+                                  & """hidden"" id=""OK"" name=""OK"" value=""0"">" _
+                                  & "<input type=""submit"" value="" OK "" " _
+                                  & "onclick=""VBScript:OK.Value=1""></p></div>"
+    ' Hide the scrollbars
+    objIE.Document.Body.Style.overflow = "auto"
+    ' Make the window visible
+    objIE.Visible = True
+    ' Set focus on UserName input field
+    objIE.Document.All.UserName.Focus
+
+    ' Wait till the OK button has been clicked
+    On Error Resume Next
+    Do While objIE.Document.All.OK.Value = 0
+        'WScript.Sleep 200
+        ' Error handling code by Denis St-Pierre
+        If Err Then    'user clicked red X (or alt-F4) to close IE window
+            IELogin = Array( "", "" )
+            objIE.Quit
+            Set objIE = Nothing
+            Exit Function
+        End if
+    Loop
+    On Error Goto 0
+
+    ' Read the password from the dialog window
+    'GetPassword = objIE.Document.All.Password.Value
+StrUserName=objIE.Document.All.UserName.Value
+
+StrPassword=objIE.Document.All.Password.Value
+
+
+    ' Close and release the object
+    objIE.Quit
+    Set objIE = Nothing
+End Function
+
+
+
+Public Function LoginCheck()
+
+
+call GetPassword( "Please enter your password:" )
+
+
+''msgbox StrUserName
+Dim LoginConnection
+Dim LoginrecordSet
+Set LoginConnection=createobject("adodb.connection")
+Set LoginrecordSet=createobject("adodb.recordset")
+LoginConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd=Transactor;database="&strDatabase
+sql = "SELECT * FROM DEMO_USERS WHERE USERNAME='" &StrUserName& " ' and PASSWORD= '" &StrPassword& " '"
+LoginrecordSet.open sql,LoginConnection,1,1
+if LoginrecordSet.RecordCount = 1 Then
+''msgbox "UserName and Password Found"
+'Wscript.Quit
+Else
+''msgbox "UserName and Password Not Found"
+Wscript.Quit
+End if 
+LoginrecordSet.close		
+Set LoginConnection=nothing
+Set LoginrecordSet=nothing
+End Function
+
+
+
+Public Function UpdateFlagsAfterExecution(Rowval)
+
+Dim UpdateConnection
+Set UpdateConnection=createobject("adodb.connection")
+Set myCommand = CreateObject("ADODB.Command" )
+UpdateConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd=Transactor;database="&strDatabase
+Set myCommand.ActiveConnection = UpdateConnection
+myCommand.CommandText = "UPDATE Application_IBPAutomation SET ScheduledStatus = 'No',QTP_MachineIP='No',Execution_Flag='No', Authentication_Flag='No', InProgress='No', ExecutionName ='No' where Aplindex='" & Rowval &"'"
+myCommand.Execute
+UpdateConnection.Close
+
+''msgbox "Execution Flags Updated"
+End Function
+
+
+
+Public Function SysName()
+Set wshShell = WScript.CreateObject( "WScript.Shell" )
+strComputerName = wshShell.ExpandEnvironmentStrings( "%COMPUTERNAME%" )
+''msgbox "Computer Name: " &strComputerName
+SysName=strComputerName
+End Function
+
+
+
+Public Function GetSystemIP()
+strIP = "No IP Found"
+set objWMI = GetObject("winmgmts:\\.\root\cimv2")
+set colNICs = objWMI.ExecQuery("Select * From Win32_NetworkAdapter WHERE NetConnectionID LIKE 'Local Area Connection'")
+    
+for each objNIC in colNICs
+    set colNICcfg = objWMI.ExecQuery("Select * From Win32_NetworkAdapterConfiguration Where MACAddress = '" & objNIC.MACAddress & "' AND IPEnabled = 'true'")
+    for each objItem in colNICcfg
+        strIP = objItem.IPAddress(0)
+
+    next
+next
+''msgbox strIP
+GetSystemIP=strIP
+End Function
+
+
+''''''''''<<===========================Function for setting data RowExecute sheet========================>>
+''''''''''Input := Column name
+''''''''''Output:= Value of that particular column
+'''''''###Dependency:=sheetpath,sheetname are hot coded need to change in future
+Public Function fupdateRowtoexecute_QTP(Rowval)
+Appsheetpath="C:\IBP_Automation\Main_Execution.xls"
+Appsheetname="RoWSheet"
+'On Error Resume Next
+Set xlobj=CreateObject("Excel.Application")
+xlobj.DisplayAlerts=False
+Set xlworkbook=xlobj.Workbooks.Open(Appsheetpath)
+Set xlsheet=xlworkbook.Worksheets(Appsheetname)
+Set objusedrange=xlSheet.UsedRange
+Set objCell = objusedrange.Find("Row_Execute")
+'xlworkbook.xlsheet.Cells(1, 1).Value = "Test value"
+
+ xlsheet.Rows(2).Columns(objCell.Column).Value=Rowval
+
+xlobj.ActiveWorkbook.Save
+
+
+
+xlworkbook.Close
+xlobj.Quit
+Set xlSheet = Nothing
+Set objusedrange = Nothing
+Set xlworkbook = Nothing
+Set xlobj = Nothing
+End Function
+
+Public Function fupdateDatatoexecute_QTP(Rowval)
+file="C:\IBP_Automation\Main_Execution.txt"
+''msgbox "Inside the fupdateDatatoexecute_QTP"
+Const ForWriting = 2
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+if objFSO.FileExists(file) then
+	Set objFile = objFSO.OpenTextFile(file, ForWriting)
+	objFile.Write Rowval
+	objFile.Close
+Else
+       
+        Set objFile =objFSO.CreateTextFile(file, ForWriting)
+       ' 'msgbox "file newly created"
+	objFile.Write Rowval
+	objFile.Close
+End if
+End function
+
+
+''''''''''<<===========================End Function for setting data RowExecute sheet========================>>
+
+
+
+''''''''''<<===========================Function for putting the results in Report table"========================>>
+Public Function Report_Update(ReleaseName,strservername,Strrunname,objTestSet_Name,theTSTest_Name,strReportStatus,StrExecutionDate,StrExecutionTime,StrExecutionDuration,StrExecutionRunname,StrCountryCode,StrTestRunName_DB,StrAvailabilityStatus)
+strdate=Split(StrExecutionDate," ")
+StrExecutionDate=strdate(0)
+''msgbox StrExecutionDate
+'msgbox "StrAppName in Report_update" &StrAppName
+If StrAppName="CMS" Then
+	'strservername=objTestSet_Name
+'msgbox strservername & "strservername in Report"
+	StrCountryCode=NULL
+	theTSTest_Name=objTestSet_Name
+'msgbox theTSTest_Name &"theTSTest_Name  in report"
+
+End If
+Dim ReportConnection
+Set ReportConnection=createobject("adodb.connection")
+
+'Msgbox strDatabase
+ReportConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd=Transactor;database="&strDatabase
+sql = "INSERT INTO Report_IBPAutomation VALUES ('"& ReleaseName &"','" &Strrunname&"','"&strservername&"','"&objTestSet_Name&"','"&theTSTest_Name&"','"&strReportStatus&"','"&StrExecutionDate&"','"&StrExecutionTime&"','"&StrExecutionDuration&"','"&StrExecutionRunname&"',NULL,NULL,'"&StrCountryCode&"','"&StrTestRunName_DB&"','"&StrAvailabilityStatus&"');"
+'Msgbox sql
+ReportConnection.Execute sql
+ReportConnection.Close
+'Msgbox "Completed"
+End Function
+
+''''''''''<<===========================End of Results Updation in Report_IBPAutomation table========================>>
+
+
+''''''''''<<===========================Function for Closing the QTP and there instance"========================>>
+'This function closes all previous instances/processes of QTP one by one
+Public Function  fn_CloseApplication(byval sApplicationExe)
+Dim strComputer
+Dim objWMIService
+Dim colProcesses
+Dim objProcess
+strComputer = "."
+Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\cimv2")
+
+Set colProcesses = objWMIService.ExecQuery ("Select * from Win32_Process Where Name = '"&sApplicationExe&"'")
+For Each objProcess in colProcesses
+objProcess.Terminate()
+Next
+Set objWMIService = Nothing
+Set colProcesses=Nothing
+End Function
+
+Public Function Open_QTP()
+'rem  launch QTP
+Set objQtpApp = CreateObject("QuickTest.Application")
+objQtpApp.Launch
+objQtpApp.Visible = True
+End Function
+
+''''''''''<<===========================End Function for Closing the QTP and there instance + Excel close"=======================
+
+
+''''''''''<<===========================Function for Opeing the IE and navigate to Server URL"========================>>
+Public Function FOpenIE()
+strServerURL=CommonrecordSet.fields("Server_URL")
+''msgbox strServerURL
+strservername=CommonrecordSet.fields("Server_Name")
+''msgbox strservername
+Set objIE = CreateObject("InternetExplorer.Application" )
+    objIE.Navigate strServerURL
+    objIE.Visible = True
+    'objIE.FullScreen = True
+ objIE.Width = 999
+ objIE.Height = 999
+While objIE.Busy 
+WScript.Sleep 100
+Wend
+
+
+''msgbox "IE opened"
+Strhub_country=CommonrecordSet.fields("Server_Country")
+if Strhub_country<>"" then
+''msgbox "Selected Hub Country for current Execution (Please select the country details: "&Strhub_country
+End if
+End Function
+
+
+''''''''''<<===========================End of Function for Opeing the IE and navigate to Server URL"========================>>
+
+
+'<<<<<<<<<<<<<<Start of Execution>>>>>>>>>>>>>>>>>>>
+'strDBEnv=GetEnvDetails("")
+'if lcase(strDBEnv)="prod" then
+'strDatabase="SmokeTA"  'Production
+'Elseif lcase(strDBEnv)="qat" then
+'strDatabase="QAT_Automation"    'QAT
+'Else
+''msgbox "please select Env properly"
+'End if
+
+
+
+Call GetAthu()
+Dim StrUserName, StrPassword
+
+call fn_CloseApplication( "cmd.exe")
+call fn_CloseApplication( "QTPro.exe")
+call fn_CloseApplication( "QTAutomationAgent.exe")
+call fn_CloseApplication( "bp_exec_agent.exe")
+call fn_CloseApplication( "Wexectrl.exe")
+'call fn_CloseApplication( "iexplore.exe")
+Call DeleteTempFiles()
+Call Open_QTP()
+
+
+
+Dim CommonConnection
+Dim CommonrecordSet
+Dim StrRelease,Strrunname,Strservername,Strtotalrunname
+Dim Instancearray()
+Dim strIP
+Dim strComputerName
+strComputerName=SysName()
+
+
+Dim objTDCon, objTreeMgr, objTestSetFolder, objTestSetList
+Dim objTestSet, objScheduler, objExecStatus, objTestExecStatus
+Dim strTestSetFolderPath, strTestSetName, strReportStatus, intCounter,StrCountryCode
+
+Set CommonConnection=createobject("adodb.connection")
+Set CommonrecordSet=createobject("adodb.recordset")
+
+strIP=GetSystemIP()
+strIP=trim(strIP)
+''msgbox "System IP: "&strIP
+CommonConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd="";database="&strDatabase
+qstring="SELECT * FROM Application_IBPAutomation WHERE Execution_Flag ='Yes'AND QTP_MachineIP='"&strIP&"' ORDER BY ReleaseName ASC" 
+CommonrecordSet.open qstring,CommonConnection,1,1
+
+
+''msgbox "Total Row reterived based on criteria : "&CommonrecordSet.RecordCount
+
+
+on Error resume Next
+for serveri=1 to CommonrecordSet.RecordCount
+	StrRelease=trim(CommonrecordSet.fields("ReleaseName"))
+	Production=trim(CommonrecordSet.fields("Env_Prod"))
+	QAT=trim(CommonrecordSet.fields("Env_QAT"))
+	Strservername=trim(CommonrecordSet.fields("Server_Name"))
+	StrCountryCode=trim(CommonrecordSet.fields("Country_Code"))
+	StrAppName=trim(CommonrecordSet.fields("Application_Name"))
+
+	if Production="Yes" and QAT="No" Then
+		Strrunname="PROD"
+	Else
+		Strrunname="QAT"
+	End if
+
+	Strtotalrunname=StrRelease&"_"&Strrunname&"_"&Strservername
+	''''''msgbox "Unique Run Name going to update in QC:"&Strtotalrunname
+
+	'''''''<<<<<<==================Qc Connection =================================>>>>>>
+	
+
+	'Declare the Test Folder, Test and Host you wish to run the test on
+	'Enter the URL to QC server
+	strQCURL = trim(CommonrecordSet.fields("QCURL_path"))
+
+	'Enter Domain to use on QC server
+	strQCDomain = trim(CommonrecordSet.fields("QCDomain"))
+	'Enter Project Name
+	strQCProject = trim(CommonrecordSet.fields("QCProject"))
+
+
+	'Enter the User name to log in and run test
+	strQCUser = trim(CommonrecordSet.fields("QCUser"))
+	'Enter user password for the account above.
+	strQCPassword = trim(CommonrecordSet.fields("QCPassword"))
+
+
+
+	'Enter the path to the Test set folder
+	strTestSetFolderPath = trim(CommonrecordSet.fields("TestSetFolderPath"))
+	'Enter the test set to be run
+	strTestSetName = trim(CommonrecordSet.fields("TestSetName"))
+
+
+	'Enter the target machine to run test
+	strHostName=trim(CommonrecordSet.fields("HostName"))
+
+
+
+	'Connect to Quality Center and login.
+	Set objTDCon = CreateObject("TDApiOle80.TDConnection")
+	'Make connection to QC server
+	objTDCon.InitConnectionEx strQCURL
+	'Login in to QC server
+	objTDCon.Login strQCUser, strQCPassword
+	'select Domain and project
+	objTDCon.Connect strQCDomain, strQCProject
+''msgbox "Connectd"
+	'''''''<<<<<<==================End of Qc Connection =================================>>>>>>
+
+	'Select the test to run
+	Set objTreeMgr = objTDCon.TestSetTreeManager
+	Set objTestSetFolder = objTreeMgr.NodeByPath(strTestSetFolderPath)
+''msgbox strTestSetFolderPath
+	If (objTestSetFolder Is Nothing) Then
+		''msgbox strTestSetFolderPath&"Folder is not found"
+	Else
+		''msgbox "Folder is found"
+	End If
+
+	Rowval=CommonrecordSet.fields("AplIndex")
+	''''''msgbox "Row Value going to update in Excel File:"&Rowval
+	'''''Call fupdateRowtoexecute_QTP(Rowval)
+        Call fupdateDatatoexecute_QTP(Rowval)
+	Call FOpenIE()
+	''''''''<<<<<<<<<<=================Starting Spliting the testsets to execute one by one=================>>>>>>
+	strTestSetName1=Split(strTestSetName,";")
+        '<<<<<<<<<<<<<<TestSet Level Execution Starting>>>>>>>>>>>>>>>>>>>
+	For exei=0 to UBound(strTestSetName1)
+			Set objTestSetList = objTestSetFolder.FindTestSets (strTestSetName1(exei))
+                	intCounter = 1
+
+			''''''''<<<<<<<<<<=================While for finding the testset in specified folder========>>>>>>>>>
+			'find test set object
+			While intCounter <= objTestSetList.Count
+				Set objTestSet = objTestSetList.Item(intCounter)
+				''msgbox "Test set name=" & objTestSet.Name
+				If objTestSet.Name = sstrTestSetName1(exei) Then
+					intCounter = objTestSetList.Count + 1
+				End If
+				intCounter = intCounter + 1
+			Wend
+			
+			''''''''<<<<<<<<<<=================Need to include the Testinstance for finding the run count for testcase========>>>>>
+			
+			instcount=0
+			Set TSTestFact = objTestSet.TSTestFactory
+			Set TestSetTestsList = TSTestFact.NewList("")
+			''msgbox TestSetTestsList.Count
+			ReDim Instancearray(TestSetTestsList.Count)
+			For Each theTSTest In TestSetTestsList
+                        	Set RunFactory = theTSTest.RunFactory
+                           	Set RunList = RunFactory.NewList("")
+                                Instancearray(instcount)=RunList.Count
+				instcount=instcount+1
+                        Next
+			for i =0 to ubound(Instancearray)-1
+				''''''msgbox  "Instance Array :"&i&"Testcase:"&Instancearray(i)
+			Next
+
+			''''''''<<<<<<<<<<=================End Need to include the Testinstance for findinf the run count for testcase========>>>>>
+	
+			''''''''<<<<<<<<<<=================calling the shedular to run the specified testset========>>>>>>>>
+			'Set the Host name to run on and run the test.
+			set objScheduler = objTestSet.StartExecution ("")
+			' Set this empty to run local for automation run agent
+			'objScheduler.TdHostName = strHostName
+			objScheduler.RunAllLocally=True
+
+			objScheduler.Run
+			''msgbox "Started Execution"
+
+
+			''''''''<<<<<<<<<<=================Waitinf for execution completion========>>>>>>>>
+			'Wait for the test to run to completion.
+			Set objExecStatus = objScheduler.ExecutionStatus
+			While objExecStatus.Finished = False
+				objExecStatus.RefreshExecStatusInfo "all", True
+				If objExecStatus.Finished = False Then
+					WScript.sleep 5
+				End If
+			Wend
+
+			''''''''<<<<<<<<<<=================Execution result at Testset level========>>>>>>>>
+
+                        testsPassed=0
+			strReportStatus = "Passed"
+			''''''''<<<<<<<<<<=================Loop the all the testcase in testset and showing the result========>>>>>>>>
+			For intCounter = 1 To objExecStatus.Count
+				Set objTestExecStatus = objExecStatus.Item(intCounter )
+				''msgbox intCounter & " TestCase " & objTestExecStatus.Status
+				If Not ( Instr (1, Ucase( objTestExecStatus.Status ), Ucase ( "Passed" ) ) > 0 ) Then
+					strReportStatus = "Failed"
+					testsPassed = 0
+				Exit For
+				Else
+					testsPassed = 1
+				End If
+			Next
+	
+			''msgbox objTestSet.Name & ":="&strReportStatus
+			''msgbox "No of testset passed:=" & testsPassed
+			''msgbox exei & ":=Test case completed"
+
+
+			''''''''<<<<<<<<<<=================Updating the unique test name for each run========>>>>>>>>
+			instcount=0
+			Set TSTestFact = objTestSet.TSTestFactory
+			Set TestSetTestsList = TSTestFact.NewList("")
+			For Each theTSTest In TestSetTestsList
+                        	Set RunFactory = theTSTest.RunFactory
+                           	Set RunList = RunFactory.NewList("")
+                                'msgbox RunList.Count
+                                '<<<<<Assigning the current testcase nuimber to udpaet the run name>>>>>>>>
+				
+				'c=Instancearray(instcount)+1
+                                ''msgbox "test instance going to update in :"&C
+				 c=RunList.Count
+
+				for ij=1 to c
+					
+					rshost=RunList.item(ij).Field("RN_HOST")
+					
+					if strComputerName=rshost then
+						'msgbox "Run found" & ij
+						c=ij
+						Exit For
+					End if
+                                      
+                               Next
+'msgbox "Run going update in Row:"&c
+
+                               	'msgbox RunList.item(c).Name
+				
+				'Msgbox "Run name going to update: "&Strtotalrunname
+				
+				RunList.item(c).Name=Strtotalrunname
+			
+						
+				StrExecutionStatus=RunList.item(c).Field("RN_STATUS")
+
+				StrExecutionDate=RunList.item(c).Field("RN_EXECUTION_DATE")
+				StrExecutionTime=RunList.item(c).Field("RN_EXECUTION_TIME")
+				StrExecutionDuration=RunList.item(c).Field("RN_DURATION")
+				StrExecutionRunname=RunList.item(c).Field("RN_RUN_NAME")
+on Error resume Next
+	                        RunList.item(c).post
+
+				'msgbox Err.Number & Err.Description
+				'<<<=============Reporting===============
+				'''msgbox "Report i/p Release Name--->"&ReleaseName
+				'''msgbox "Report i/p ServerName--->"&strservername
+				'''msgbox "Report i/p Environment Name--->"&Strrunname
+				'''msgbox "Report i/p TestSetName--->"&objTestSet.Name
+				'''msgbox "Report i/p TestCaseName--->"&theTSTest.Name
+				'==================Availablity Reporting==========
+				if lcase(trim(StrExecutionStatus)) = "passed" then
+					StrAvailabilityStatus="Green"
+				Else
+					'StrAvailabilityStatus="Testing In Progress"
+					 StrAvailabilityStatus_DB=AvailablityReporting(objTestSet_Name)
+					 Select Case trim(StrAvailabilityStatus_DB)
+					 Case "0"
+						StrAvailabilityStatus ="Red"
+					 Case "1"
+						StrAvailabilityStatus ="Yellow"
+					 End Select
+					
+				End if
+
+
+
+
+				'================End Availablity Reporting============
+				objTestSet_Name=objTestSet.Name
+				theTSTest_Name=theTSTest.Name
+				'''msgbox "Report i/p Status--->"&StrExecutionStatus
+				strQTP_MachineIP=GetSystemIP()
+'msgbox strservername
+'msgbox strQTP_MachineIP
+                                StrTestRunName_DB=GetTestRunNameFromAppTable(strservername,strQTP_MachineIP)
+'msgbox "Run name from APP Table"&StrTestRunName_DB
+				Call Report_Update(StrRelease,Strservername,Strtotalrunname,objTestSet_Name,theTSTest_Name,StrExecutionStatus,StrExecutionDate,StrExecutionTime,StrExecutionDuration,StrExecutionRunname,StrCountryCode,StrTestRunName_DB,StrAvailabilityStatus)
+strappname=split(StrTestRunName_DB,"_")
+'Msgbox strappname(0)	        
+APPLICATION_NAME=strappname(0)
+'msgbox "APPLICATION_NAME ="&APPLICATION_NAME
+ENVIRONMENT_NAME=Strrunname
+'msgbox "ENVIRONMENT_NAME ="&ENVIRONMENT_NAME
+SERVER_NAME=Strservername
+'msgbox "SERVER_NAME ="&SERVER_NAME
+TESTCASE_NAME=objTestSet_Name
+'msgbox "TESTCASE_NAME="&TESTCASE_NAME
+EXECUTION_STATUS=StrExecutionStatus
+'msgbox "EXECUTION_STATUS="&EXECUTION_STATUS
+EXECUTION_NAME=StrTestRunName_DB
+'msgbox "EXECUTION_NAME="&EXECUTION_NAME
+AVAILIBILITY_STATUS="NULL"
+'msgbox "AVAILIBILITY_STATUS="&AVAILIBILITY_STATUS
+EXECUTION_DATE=StrExecutionDate
+'msgbox "EXECUTION_DATE="&EXECUTION_DATE
+TIME=StrExecutionTime
+'msgbox "TIME="&TIME
+DURATION=StrExecutionDuration
+'msgbox "DURATION="&DURATION
+				Call Execution_Summary(APPLICATION_NAME,ENVIRONMENT_NAME,SERVER_NAME,TESTCASE_NAME,EXECUTION_STATUS,EXECUTION_NAME,AVAILIBILITY_STATUS,EXECUTION_DATE,TIME,DURATION)
+				
+				instcount=instcount+1          
+                 	 Next
+			'<<<<==========End of Updating the unique test name for each run======================= 
+
+
+	Next
+	'<<<<<<<<<<<<<<END TestSet Level Execution>>>>>>>>>>>>>>>>>>>
+
+
+
+
+
+	objTDCon.DisconnectProject
+
+	Call UpdateFlagsAfterExecution(Rowval)
+	CommonrecordSet.movenext
+
+	if err.Number<>0 then 
+		''msgbox err.description
+	End if
+'call fn_CloseApplication( "iexplore.exe")
+
+Next
+
+
+
+CommonrecordSet.close		
+Set CommonConnection=nothing
+Set CommonrecordSet=nothing

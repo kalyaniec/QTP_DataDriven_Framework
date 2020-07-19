@@ -1,0 +1,137 @@
+
+'Msgbox "Inside Check variables vbs"
+
+Dim strServer
+strServer=""
+Public function getDBName()
+'msgbox "Getting DB Name from ExecuteByFrameworktxt file in IBP Folder"
+Const ForReading = 1
+
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+Set objTextFile = objFSO.OpenTextFile("C:\IBP_Automation\ExecuteByFramework.txt", ForReading)
+For i = 1 to 2
+    strLine=objTextFile.ReadLine
+Next
+'msgbox strLine
+
+
+objTextFile.Close
+getDBName=trim(strLine)
+End Function
+
+Public Function FCheckforMaintxt()
+DIM fso
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+If (fso.FileExists("C:\IBP_Automation\Main_Execution.txt")) Then
+contents=GetExecutionFramedata()
+	if lcase(contents)="yes" then
+		FCheckforMaintxt="Yes"
+	Else
+		FCheckforMaintxt="No"
+	End if
+Else
+FCheckforMaintxt="No"
+End If
+End Function
+'=============================
+Public Function fgetdata(colname)
+
+APPData=APPrecordSet.fields(colname)
+
+if APPData="" or IsNull(APPData)="True" then
+	   APPData="<SKIP>"
+End if
+
+ 
+fgetdata=APPData
+
+End Function
+
+Public Function GetRowFromFile()
+file="C:\IBP_Automation\Main_Execution.txt"
+Const conForReading = 1
+Dim objFSO, objReadFile, contents
+
+'Set Objects
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+Set objReadFile = objFSO.OpenTextFile(file, 1, False)
+
+'Read file contents
+
+
+Rowval = objReadFile.ReadLine
+''msgbox "Row to Execute: "&Rowval
+
+
+
+'Close file
+objReadFile.close
+
+
+
+'Cleanup objects
+Set objFSO = Nothing
+Set objReadFile = Nothing 
+
+
+GetRowFromFile=Rowval
+
+End Function
+
+
+
+Public Function GetExecutionFramedata()
+file="C:\IBP_Automation\ExecuteByFramework.txt"
+Const ForWriting = 2
+Const ForReading = 1
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+if objFSO.FileExists(file) then
+	Set objFile = objFSO.OpenTextFile(file, ForReading)
+	contents = objFile.ReadLine
+        'msgbox contents
+	objFile.Close
+Else
+       
+        Set objFile =objFSO.CreateTextFile(file, ForWriting)
+       ' 'msgbox "file newly created"
+	objFile.Write "Yes"
+	objFile.Close
+End if
+GetExecutionFramedata=contents
+End function
+
+'================
+Dim StrFCheck
+Dim APPConnection
+Dim APPrecordSet
+Dim contents
+StrFCheck=FCheckforMaintxt()
+''msgbox "StrFCheck"&StrFCheck
+if lcase(StrFCheck)="yes" then
+	Approwexe=GetRowFromFile()
+        ''msgbox "Final Row to execute"&Approwexe
+	Set APPConnection=createobject("adodb.connection")
+	Set APPrecordSet=createobject("adodb.recordset")
+	strLine=getDBName()
+'msgbox strLine
+	APPConnection.open "driver={SQL Server};server="&strServer&";uid=Transactor;pwd=Transactor;database="&strLine
+	qstring="SELECT * FROM Application_IBPAutomation WHERE Aplindex= '"&Approwexe&"'"
+	APPrecordSet.open qstring,APPConnection,1,1
+	'str=fgetdata("Server_Language")
+       	'msgbox "language: "&str
+	''msgbox "before loading testags"
+    	ExecuteFile "C:\IBP_Automation\LoadTestArg.vbs"
+
+APPrecordSet.close		
+Set APPConnection=nothing
+Set APPrecordSet=nothing
+
+End if
+
+
+
+
+
+
